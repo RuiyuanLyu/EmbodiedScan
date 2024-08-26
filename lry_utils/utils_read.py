@@ -416,7 +416,7 @@ def to_scene_id(name):
 def to_sample_idx(name):
     return name if is_sample_idx(name) else scene_id_to_sample_idx(name)
 
-def read_es_info(path, show_progress=True, count_type_from_zero=False):
+def read_es_info(path, show_progress=False, count_type_from_zero=False):
     data = np.load(path, allow_pickle=True)
     data_list = data["data_list"]
     object_type_to_int = data["metainfo"]["categories"]
@@ -455,7 +455,7 @@ def read_es_info(path, show_progress=True, count_type_from_zero=False):
         }
     return output_data
 
-def read_es_infos(paths, show_progress=True, count_type_from_zero=False):
+def read_es_infos(paths, show_progress=False, count_type_from_zero=False):
     output_data = {}
     if isinstance(paths, str):
         paths = [paths]
