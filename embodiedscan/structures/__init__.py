@@ -4,7 +4,6 @@ from .bbox_3d import (BaseInstance3DBoxes, Box3DMode, Coord3DMode,
                       get_box_type, get_proj_mat_by_coord_type, limit_period,
                       mono_cam_box2vis, points_cam2img, points_img2cam,
                       rotation_3d_in_axis, rotation_3d_in_euler, xywhr2xyxyr)
-from .det3d_data_sample import Det3DDataSample
 
 __all__ = [
     'BaseInstance3DBoxes', 'Box3DMode', 'Coord3DMode', 'EulerInstance3DBoxes',
