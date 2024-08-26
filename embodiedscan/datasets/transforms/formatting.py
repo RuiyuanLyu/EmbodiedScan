@@ -46,7 +46,7 @@ def to_tensor(
 
 @TRANSFORMS.register_module()
 class Pack3DDetInputs(BaseTransform):
-    INPUTS_KEYS = ['points', 'img']
+    INPUTS_KEYS = ['points', 'img', 'sample_idx_mmscan']
     # to be compatible with depths in bevdepth
     INSTANCEDATA_3D_KEYS = [
         'gt_bboxes_3d', 'gt_labels_3d', 'attr_labels', 'depths', 'centers_2d'
@@ -274,6 +274,7 @@ class Pack3DDetInputs(BaseTransform):
         data_sample.gt_depth_map = gt_depth_map
 
         if 'eval_ann_info' in results:
+            results['eval_ann_info']['sample_idx_mmscan'] = inputs.get('sample_idx_mmscan')
             data_sample.eval_ann_info = results['eval_ann_info']
         else:
             data_sample.eval_ann_info = None
@@ -281,6 +282,7 @@ class Pack3DDetInputs(BaseTransform):
         packed_results = dict()
         packed_results['data_samples'] = data_sample
         packed_results['inputs'] = inputs
+        # assert packed_results['inputs']['sample_idx_mmscan'] # lry mod
         return packed_results
 
     def __repr__(self) -> str:

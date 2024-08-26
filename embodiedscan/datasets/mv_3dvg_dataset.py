@@ -12,6 +12,7 @@ from mmengine.fileio import load
 from embodiedscan.registry import DATASETS
 from embodiedscan.structures import get_box_type
 
+from lry_utils.utils_read import to_sample_idx
 
 @DATASETS.register_module()
 class MultiView3DGroundingDataset(BaseDataset):
@@ -145,6 +146,13 @@ class MultiView3DGroundingDataset(BaseDataset):
             if metainfo['classes'] == 'all':
                 metainfo['classes'] = list(self.METAINFO['classes'])
 
+        self.det3d_valid_id2label = np.zeros(
+            max(self.METAINFO['valid_class_ids']) + 1, dtype=np.int64)
+        for _ in range(self.det3d_valid_id2label.shape[0]):
+            self.det3d_valid_id2label[_] = -1
+        for cls_idx, cat_id in enumerate(self.METAINFO['valid_class_ids']):
+            self.det3d_valid_id2label[cat_id] = cls_idx
+
         self.box_type_3d, self.box_mode_3d = get_box_type(box_type_3d)
         self.filter_empty_gt = filter_empty_gt
         self.remove_dontcare = remove_dontcare
@@ -162,6 +170,7 @@ class MultiView3DGroundingDataset(BaseDataset):
         self.vg_file = osp.join(self.data_root, vg_file)
         self.convert_info_to_scan()
         self.data_list = self.load_language_data()
+        print(f"successfully loaded {len(self.data_list)} samples")
         self.data_bytes, self.data_address = self._serialize_data()
         self.serialize_data = True
 
@@ -300,12 +309,19 @@ class MultiView3DGroundingDataset(BaseDataset):
         # According to each object annotation,
         # find all objects in the corresponding scan
         language_infos = []
+        print("number of scans loaded from info data:", len(list(self.scans.keys())))
+        num_dropped_by_not_scan_id = 0
+        num_dropped_by_multiple = 0
         for anno in mmengine.track_iter_progress(language_annotations):
             language_info = dict()
+            anno['scan_id'] = to_sample_idx(anno['scan_id'])
             language_info.update({
                 'scan_id': anno['scan_id'],
                 'text': anno['text']
             })
+            if language_info['scan_id'] not in self.scans:
+                num_dropped_by_not_scan_id +=1
+                continue
             data = self.scans[language_info['scan_id']]
             language_info['axis_align_matrix'] = data['axis_align_matrix']
             language_info['img_path'] = data['img_path']
@@ -334,6 +350,7 @@ class MultiView3DGroundingDataset(BaseDataset):
                     object_ind = np.where(
                         object_ids == language_info['target_id'])[0]
                     if len(object_ind) != 1:
+                        num_dropped_by_multiple += 1
                         continue
                     language_anno_info['gt_bboxes_3d'] = bboxes[object_ind]
                     language_anno_info['gt_labels_3d'] = labels[object_ind]
@@ -353,6 +370,7 @@ class MultiView3DGroundingDataset(BaseDataset):
                     is_mapping_unique = True
                     for idx, target_id in enumerate(
                             language_info['target_id']):
+                        assert isinstance(target_id, int)
                         object_ind = np.where(object_ids == target_id)[0]
                         if len(object_ind) != 1:
                             is_mapping_unique = False
@@ -360,6 +378,7 @@ class MultiView3DGroundingDataset(BaseDataset):
                         keep_indices.append(idx)
                         object_indices.append(object_ind[0])
                     if not is_mapping_unique:
+                        num_dropped_by_multiple += 1
                         continue
                     else:
                         language_anno_info['gt_bboxes_3d'] = bboxes[
@@ -383,6 +402,20 @@ class MultiView3DGroundingDataset(BaseDataset):
                 ) > 3  # more than three distractors
                 language_anno_info['is_unique'] = len(
                     language_info['distractor_ids']) == 0
+                sub_class = anno.get("sub_class", "").lower()
+                if sub_class:
+                    space = "space" in sub_class or "or" in sub_class
+                    attribute = "attribute" in sub_class or "eq" in sub_class 
+                    assert space + attribute == 1, f"Invalid sub_class {sub_class}, should be space or attribute"
+                    indirect = "indirect" in sub_class
+                    direct = not indirect
+                    # assert "direct" in sub_class, f"Invalid sub_class {sub_class}, should contain the word direct"
+                    language_anno_info['space'] = space
+                    language_anno_info['direct'] = direct
+                    language_anno_info['sub_class'] = sub_class
+                else:
+                    language_anno_info['space'] = False
+                    language_anno_info['direct'] = False
             else:
                 # inference w/o gt, assign the placeholder gt_boxes and labels
                 language_anno_info['gt_bboxes_3d'] = bboxes
@@ -390,6 +423,8 @@ class MultiView3DGroundingDataset(BaseDataset):
                 # placeholder value for 'is_hard' and 'is_unique'
                 language_anno_info['is_hard'] = False
                 language_anno_info['is_unique'] = False
+                language_anno_info['space'] = False
+                language_anno_info['direct'] = False
 
             if not self.test_mode:
                 language_info['ann_info'] = language_anno_info
@@ -401,7 +436,8 @@ class MultiView3DGroundingDataset(BaseDataset):
             language_infos.append(language_info)
 
         del self.scans
-
+        print("dropped by false scan id", num_dropped_by_not_scan_id)
+        print("dropped by multiple indices", num_dropped_by_multiple)
         return language_infos
 
     def parse_data_info(self, info: dict) -> dict:
@@ -474,6 +510,15 @@ class MultiView3DGroundingDataset(BaseDataset):
         Returns:
             dict: Processed `ann_info`.
         """
+        for instance in info['instances']:
+            if instance['bbox_label_3d'] < self.det3d_valid_id2label.shape[0]:
+                value = self.det3d_valid_id2label[instance['bbox_label_3d']]
+                if value < 0:
+                    raise Exception('Class out of range')
+                instance['bbox_label_3d'] = value
+            else:
+                raise Exception('Class out of range')
+
         ann_info = None
 
         if 'instances' in info and len(info['instances']) > 0:

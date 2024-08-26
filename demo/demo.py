@@ -47,7 +47,7 @@ def init_model(config: Union[str, Path, Config],
         config.merge_from_dict(cfg_options)
 
     config.model.train_cfg = None
-    init_default_scope(config.get('default_scope', 'mmdet3d'))
+    init_default_scope(config.get('default_scope', 'embodiedscan'))
     model = MODELS.build(config.model)
 
     if checkpoint is not None:

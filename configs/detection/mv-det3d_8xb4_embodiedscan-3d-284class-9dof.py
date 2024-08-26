@@ -156,7 +156,7 @@ train_pipeline = [
          translation_std=[.1, .1, .1],
          shift_height=False),
     dict(type='Pack3DDetInputs',
-         keys=['img', 'points', 'gt_bboxes_3d', 'gt_labels_3d'])
+         keys=['img', 'points', 'gt_bboxes_3d', 'gt_labels_3d', 'sample_idx_mmscan'])
 ]
 test_pipeline = [
     dict(type='LoadAnnotations3D'),
@@ -173,7 +173,7 @@ test_pipeline = [
     dict(type='AggregateMultiViewPoints', coord_type='DEPTH'),
     dict(type='PointSample', num_points=n_points),
     dict(type='Pack3DDetInputs',
-         keys=['img', 'points', 'gt_bboxes_3d', 'gt_labels_3d'])
+         keys=['img', 'points', 'gt_bboxes_3d', 'gt_labels_3d', 'sample_idx_mmscan'])
 ]
 
 # TODO: to determine a reasonable batch size
@@ -206,10 +206,22 @@ val_dataloader = dict(batch_size=1,
                                    filter_empty_gt=True,
                                    box_type_3d='Euler-Depth',
                                    metainfo=metainfo))
-test_dataloader = val_dataloader
+test_dataloader =  dict(batch_size=12,
+                      num_workers=4,
+                      persistent_workers=True,
+                      drop_last=False,
+                      sampler=dict(type='DefaultSampler', shuffle=False),
+                      dataset=dict(type=dataset_type,
+                                   data_root=data_root,
+                                   ann_file='embodiedscan_infos_train.pkl',
+                                   pipeline=test_pipeline,
+                                   test_mode=True,
+                                   filter_empty_gt=True,
+                                   box_type_3d='Euler-Depth',
+                                   metainfo=metainfo))
 
 val_evaluator = dict(type='IndoorDetMetric')
-test_evaluator = val_evaluator
+test_evaluator = dict(type='IndoorDetMetric', format_only=True)
 
 # training schedule for 1x
 train_cfg = dict(type='EpochBasedTrainLoop', max_epochs=12, val_interval=1)

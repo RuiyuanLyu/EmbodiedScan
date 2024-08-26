@@ -2,8 +2,8 @@
 
 set -x
 
-CKPT_PATH=/mnt/petrelfs/wangtai/EmbodiedScan/work_dirs
-PARTITION=test
+CKPT_PATH=/mnt/petrelfs/lvruiyuan/repos/EmbodiedScan/work_dirs
+PARTITION=mozi-S1
 JOB_NAME=mv-grounding-challenge-benchmark
 TASK=mv-grounding-challenge-benchmark
 CONFIG=configs/grounding/mv-grounding_8xb12_embodiedscan-vg-9dof.py

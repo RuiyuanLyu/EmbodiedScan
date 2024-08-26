@@ -13,7 +13,7 @@ from mmengine.logging import MMLogger, print_log
 
 from embodiedscan.registry import METRICS
 from embodiedscan.structures import get_box_type
-
+import mmengine
 from ..indoor_eval import indoor_eval
 
 
@@ -38,11 +38,13 @@ class IndoorDetMetric(BaseMetric):
                  collect_device: str = 'cpu',
                  prefix: Optional[str] = None,
                  batchwise_anns: bool = False,
+                 format_only: bool = False,
                  **kwargs) -> None:
         super(IndoorDetMetric, self).__init__(prefix=prefix,
                                               collect_device=collect_device)
         self.iou_thr = [iou_thr] if isinstance(iou_thr, float) else iou_thr
         self.batchwise_anns = batchwise_anns
+        self.format_only = format_only
 
     def process(self, data_batch: dict, data_samples: Sequence[dict]) -> None:
         """Process one batch of data samples and predictions.
@@ -83,6 +85,26 @@ class IndoorDetMetric(BaseMetric):
             ann_infos.append(eval_ann)
             pred_results.append(sinlge_pred_results)
 
+        if self.format_only:
+            print_log("saving prediction results")
+            # import pdb; pdb.set_trace()
+            save = []
+            for ann, pred in results:
+                try:
+                    result = {}
+                    pred_boxes = pred["bboxes_3d"].tensor
+                    scores = pred['scores_3d']
+                    labels = pred['labels_3d']
+                    result['sample_idx'] = ann['sample_idx_mmscan']
+                    result['pred_boxes'] = pred_boxes.numpy()
+                    result['scores'] = scores.numpy()
+                    result['labels'] = labels.numpy()
+                    save.append(result)
+                except Exception as e:
+                    print(e)
+                    continue
+            mmengine.dump(save,'/mnt/petrelfs/lvruiyuan/repos/EmbodiedScan/work_dirs/det_predictions/pred_results_aaa.json')
+            return {}
         # some checkpoints may not record the key "box_type_3d"
         box_type_3d, box_mode_3d = get_box_type(
             self.dataset_meta.get('box_type_3d', 'depth'))

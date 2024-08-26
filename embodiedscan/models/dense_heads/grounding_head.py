@@ -329,6 +329,7 @@ class GroundingHead(BaseModule):
                     bbox_pred[..., 2] + bbox_pred[..., 3],
                     bbox_pred[..., 4] + bbox_pred[..., 5],
                 ], -1)
+                base_bbox[..., 3:6] = base_bbox.clamp(min=2e-2)
                 return base_bbox
             # for rotated boxes (7-DoF or 9-DoF)
             # dx_min, dx_max, dy_min, dy_max, dz_min, dz_max, alpha ->
@@ -357,6 +358,7 @@ class GroundingHead(BaseModule):
                 (bbox_pred[..., 0] + bbox_pred[..., 1], bbox_pred[..., 2] +
                  bbox_pred[..., 3], bbox_pred[..., 4] + bbox_pred[..., 5]),
                 dim=-1)
+            size = size.clamp(min=2e-2)
             return torch.cat((center, size, euler),
                              dim=-1).view(batch_size, num_queries, -1)
         else:

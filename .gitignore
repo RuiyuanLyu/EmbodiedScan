@@ -132,6 +132,7 @@ todo.md
 
 # demo data
 demo/data
+data/open_scan
 
 # logs and checkpoints
 work_dirs/
@@ -140,3 +141,5 @@ tools/*.sh
 # test submission results
 *.pkl
 *.json
+
+*.lprof

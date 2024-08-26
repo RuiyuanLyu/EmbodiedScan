@@ -1,5 +1,5 @@
 # Copyright (c) OpenRobotLab. All rights reserved.
-# Adapted from https://github.com/SamsungLabs/fcaf3d/blob/master/mmdet3d/models/detectors/single_stage_sparse.py # noqa
+# Adapted from https://github.com/SamsungLabs/fcaf3d/blob/master/embodiedscan/models/detectors/single_stage_sparse.py # noqa
 from typing import Dict, List, Optional, Tuple, Union
 
 import torch
@@ -173,6 +173,17 @@ class SparseFeatureFusion3DGrounder(BaseModel):
 
         return batch_features_list, batch_coords_list
 
+    def _replace_tensors_with_shape_and_dtype(self, obj):
+        if isinstance(obj, list):
+            return f"{len(obj)} copies of " + self._replace_tensors_with_shape_and_dtype(obj[0])
+        elif isinstance(obj, dict):
+            return {key: self._replace_tensors_with_shape_and_dtype(value) for key, value in obj.items()}
+        elif isinstance(obj, torch.Tensor):
+            return str((obj.shape, obj.dtype))
+        else:
+            return str(type(obj))
+
+
     def extract_feat(
         self, batch_inputs_dict: Dict[str,
                                       Tensor], batch_data_samples: SampleList
@@ -191,6 +202,11 @@ class SparseFeatureFusion3DGrounder(BaseModel):
                 and for inside 3D object detection, usually a dict containing
                 features will be obtained.
         """
+        # from copy import deepcopy
+        # show = deepcopy(batch_inputs_dict)
+        # show = self._replace_tensors_with_shape_and_dtype(show)
+        # print(show)
+        # exit()
         points = batch_inputs_dict['points']
         # construct sparse tensor and features
         if self.use_xyz_feat:
@@ -201,7 +217,10 @@ class SparseFeatureFusion3DGrounder(BaseModel):
             coordinates, features = ME.utils.batch_sparse_collate(
                 [(p[:, :3] / self.voxel_size, p[:, 3:]) for p in points],
                 device=points[0].device)
-
+        # print(f"coordinates: {coordinates.dtype} {coordinates.shape}") 
+        # print(f"features: {features.dtype}, {features.shape}") 
+        # features: torch.float32, torch.Size([100000, 3])
+        # coordinates: torch.int32 torch.Size([100000, 4])
         x = ME.SparseTensor(coordinates=coordinates, features=features)
 
         x = self.backbone_3d(x)
@@ -464,6 +483,7 @@ class SparseFeatureFusion3DGrounder(BaseModel):
         Returns:
             dict: A dictionary of loss components.
         """
+
         text_prompts = [
             data_samples.text for data_samples in batch_data_samples
         ]  # txt list
@@ -589,6 +609,8 @@ class SparseFeatureFusion3DGrounder(BaseModel):
 
         for j, tok_list in enumerate(tokens_positive):
             for (beg, end) in tok_list:
+                if end == 0:
+                    continue
                 try:
                     beg_pos = tokenized.char_to_token(batch_idx, beg)
                     end_pos = tokenized.char_to_token(batch_idx, end - 1)

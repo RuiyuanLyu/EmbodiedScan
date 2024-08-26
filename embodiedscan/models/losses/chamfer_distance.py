@@ -169,8 +169,9 @@ def bbox_to_corners(bbox: Tensor) -> Tensor:
     assert len(
         bbox.shape
     ) == 2, 'bbox must be 2D tensor of shape (N, 6) or (N, 7) or (N, 9)'
+    device = bbox.device
     if bbox.shape[-1] == 6:
-        rot_mat = torch.eye(3, device=bbox.device).unsqueeze(0).repeat(
+        rot_mat = torch.eye(3, device=device).unsqueeze(0).repeat(
             bbox.shape[0], 1, 1)
     elif bbox.shape[-1] == 7:
         angles = bbox[:, 6:]
@@ -184,20 +185,18 @@ def bbox_to_corners(bbox: Tensor) -> Tensor:
     centers = bbox[:, :3].unsqueeze(1).repeat(1, 8, 1)  # shape (N, 8, 3)
     half_sizes = bbox[:, 3:6].unsqueeze(1).repeat(1, 8,
                                                   1) / 2  # shape (N, 8, 3)
-    eight_corners_x = torch.tensor([1, 1, 1, 1, -1, -1, -1, -1],
-                                   device=bbox.device).unsqueeze(0).repeat(
-                                       bbox.shape[0], 1)  # shape (N, 8)
-    eight_corners_y = torch.tensor([1, 1, -1, -1, 1, 1, -1, -1],
-                                   device=bbox.device).unsqueeze(0).repeat(
-                                       bbox.shape[0], 1)  # shape (N, 8)
-    eight_corners_z = torch.tensor([1, -1, 1, -1, 1, -1, 1, -1],
-                                   device=bbox.device).unsqueeze(0).repeat(
-                                       bbox.shape[0], 1)  # shape (N, 8)
-    eight_corners = torch.stack(
-        (eight_corners_x, eight_corners_y, eight_corners_z),
-        dim=-1)  # shape (N, 8, 3)
-    eight_corners = eight_corners * half_sizes  # shape (N, 8, 3)
-    # rot_mat: (N, 3, 3), eight_corners: (N, 8, 3)
+    eight_corners = [
+        [0, 0, 0],
+        [1, 0, 0],
+        [1, 1, 0],
+        [0, 1, 0],
+        [0, 0, 1],
+        [1, 0, 1],
+        [1, 1, 1],
+        [0, 1, 1],
+    ]
+    eight_corners = torch.tensor(eight_corners, device=device).float()  # shape (8, 3)
+    eight_corners = (1 - 2 * torch.tensor(eight_corners, device=device).float()) * half_sizes  # shape (8, 3)
     rotated_corners = torch.matmul(eight_corners,
                                    rot_mat.transpose(1, 2))  # shape (N, 8, 3)
     return centers + rotated_corners
